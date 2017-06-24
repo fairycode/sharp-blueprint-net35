@@ -1,6 +1,7 @@
 #tool nuget:?package=OpenCover&version=4.6.519
 #tool nuget:?package=ReportGenerator&version=2.5.8
 #tool nuget:?package=xunit.runner.console&version=2.1.0
+#tool nuget:?package=NuGet.CommandLine&version=4.1.0
 
 var target = Context.Argument("target", "Default");
 
@@ -52,18 +53,14 @@ Task("Clean")
 Task("Restore-Packages")
     .Does(() =>
 {
-    var nugetCmd = MakeAbsolute(new FilePath("tools/nuget.exe"));
+    var nugetCmd = MakeAbsolute(new FilePath("tools/NuGet.CommandLine/tools/NuGet.exe"));
     var sln = MakeAbsolute(new FilePath("./SharpBlueprint.NET35.sln"));
-
-    foreach (var file in GetFiles("tools/*"))
-        Information(file);
 
     var packageConfigs = GetFiles("./src/**/packages.config");
     packageConfigs.Add(GetFiles("./test/**/packages.config"));
 
     foreach (var packageConfig in packageConfigs)
     {
-        Information("packageConfig: " + packageConfig);
         using (var process = StartAndReturnProcess(
             nugetCmd,
             new ProcessSettings { Arguments = "restore " + packageConfig + " -SolutionDirectory " + sln.GetDirectory() }))
@@ -168,10 +165,9 @@ Task("Create-Packages")
     .Does(() =>
 {
     var projectFile = MakeAbsolute(new FilePath("./src/SharpBlueprint.Client/SharpBlueprint.Client.csproj"));
-    var nugetCmd = MakeAbsolute(new FilePath("tools/nuget.exe"));
+    var nugetCmd = MakeAbsolute(new FilePath("tools/NuGet.CommandLine/tools/NuGet.exe"));
 
     var args = new StringBuilder();
-
     args.Append("pack ").Append(projectFile);
     args.Append(" -Symbols -Properties Configuration=").Append(configuration);
     args.Append(" -OutputDirectory ").Append(nugetDir);
@@ -302,7 +298,7 @@ private static string GetVersion(string csproj)
 /// </summary>
 private static void UploadPackages(ICakeContext context, string url, string key, string nugetDir)
 {
-    var nugetCmd = context.MakeAbsolute(new FilePath("tools/nuget.exe"));
+    var nugetCmd = context.MakeAbsolute(new FilePath("tools/NuGet.CommandLine/tools/NuGet.exe"));
 
     foreach (var package in context.GetFiles(nugetDir + "/*.nupkg"))
     {
