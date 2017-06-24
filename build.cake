@@ -230,7 +230,8 @@ Task("Publish-NuGet")
 //
 
 Task("Default")
-    .IsDependentOn("Create-Packages");
+    .IsDependentOn("Create-Packages")
+    .IsDependentOn("Publish-NuGet");
 
 //
 // Run build
