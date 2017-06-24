@@ -52,7 +52,15 @@ Task("Clean")
 Task("Restore-Packages")
     .Does(() =>
 {
-    DotNetCoreRestore();
+    var nugetCmd = MakeAbsolute(new FilePath("tools/nuget.exe"));
+    using (var process = StartAndReturnProcess(
+        nugetCmd,
+        new ProcessSettings { Arguments = "restore" }))
+    {
+        process.WaitForExit();
+        if (process.GetExitCode() != 0)
+            throw new Exception("Packages restoring has failed!");
+    }
 });
 
 Task("Build")
