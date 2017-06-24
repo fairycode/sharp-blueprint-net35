@@ -64,7 +64,8 @@ Task("Build")
     var projects = GetFiles("./src/**/*.csproj");
     projects.Add(GetFiles("./test/**/*.csproj"));
 
-    var msbuildCmd = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\MSBuild\\15.0\\Bin\\MSBuild.exe";
+    //var msbuildCmd = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\MSBuild\\15.0\\Bin\\MSBuild.exe";
+    var msbuildCmd = "msbuild";
 
     foreach(var project in projects)
     {
