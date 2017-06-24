@@ -54,22 +54,20 @@ Task("Restore-Packages")
 {
     var nugetCmd = MakeAbsolute(new FilePath("tools/nuget.exe"));
     var sln = MakeAbsolute(new FilePath("./SharpBlueprint.NET35.sln"));
-    Information(nugetCmd);
-    Information(sln);
-    try
+
+    var packageConfigs = GetFiles("./src/**/packages.config");
+    packageConfigs.Add(GetFiles("./test/**/packages.config"));
+
+    foreach (var packageConfig in packageConfigs)
     {
         using (var process = StartAndReturnProcess(
             nugetCmd,
-            new ProcessSettings { Arguments = "restore " + sln.FullPath }))
+            new ProcessSettings { Arguments = "restore " + packageConfig + " -SolutionDirectory " + sln.GetDirectory() }))
         {
             process.WaitForExit();
             if (process.GetExitCode() != 0)
-                throw new Exception("Packages restoring has failed!");
+                throw new Exception("Restoring packages for " + packageConfig.GetFilename() + " has failed!");
         }
-    }
-    catch (Exception ex)
-    {
-        Information(ex.Message);
     }
 });
 
