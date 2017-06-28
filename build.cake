@@ -304,14 +304,14 @@ private static void UploadPackages(ICakeContext context, string url, string key,
     foreach (var package in context.GetFiles(nugetDir + "/*.nupkg"))
     {
         // symbols packages are pushed alongside regular ones so no need to push them explicitly
-        if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
-            continue;
+        //if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+        //    continue;
 
         var args = new StringBuilder();
         args.Append("push ").Append(context.MakeAbsolute(package));
         args.Append(" -Source ").Append(url);
         args.Append(" -ApiKey ").Append(key);
-        args.Append(" -NonInteractive");
+        args.Append(" -NonInteractive -NoSymbols");
 
         var attempt = 0;
         var pushed = false;
