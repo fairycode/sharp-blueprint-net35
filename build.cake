@@ -315,13 +315,16 @@ private static void UploadPackages(ICakeContext context, string url, string key,
 
         var attempt = 0;
         var pushed = false;
-        while (!pushed && attempt++ <= 3)
+        var pushNum = 0;
+        while (!pushed && attempt++ < 3)
         {
             using (var process = context.StartAndReturnProcess(
                 nugetCmd,
                 new ProcessSettings { Arguments = args.ToString() }
             ))
             {
+                pushNum += 1;
+                context.Information("push number: " + pushNum);
                 process.WaitForExit();
                 var exitCode = process.GetExitCode();
                 if (exitCode != 0)
