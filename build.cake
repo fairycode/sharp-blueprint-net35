@@ -310,12 +310,11 @@ private static void UploadPackages(ICakeContext context, string url, string key,
         var args = new StringBuilder();
         args.Append("push ").Append(context.MakeAbsolute(package));
         args.Append(" -Source ").Append(url);
-        args.Append(" -ApiKey ").Append(key + "123456");
+        args.Append(" -ApiKey ").Append(key);
         args.Append(" -NonInteractive");
 
         var attempt = 0;
         var pushed = false;
-        var pushNum = 0;
         while (!pushed && attempt++ < 3)
         {
             using (var process = context.StartAndReturnProcess(
@@ -323,8 +322,6 @@ private static void UploadPackages(ICakeContext context, string url, string key,
                 new ProcessSettings { Arguments = args.ToString() }
             ))
             {
-                pushNum += 1;
-                context.Information("push number: " + pushNum);
                 process.WaitForExit();
                 var exitCode = process.GetExitCode();
                 if (exitCode != 0)
