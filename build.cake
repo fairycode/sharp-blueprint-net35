@@ -310,7 +310,7 @@ private static void UploadPackages(ICakeContext context, string url, string key,
         var args = new StringBuilder();
         args.Append("push ").Append(context.MakeAbsolute(package));
         args.Append(" -Source ").Append(url);
-        args.Append(" -ApiKey ").Append(key);
+        args.Append(" -ApiKey ").Append(key + "123456");
         args.Append(" -NonInteractive");
 
         var attempt = 0;
@@ -332,7 +332,7 @@ private static void UploadPackages(ICakeContext context, string url, string key,
                         context.Information("Attempt: " + (attempt + 1));
                     }
                     else
-                        context.Information("Pushing " + package.GetFilename() + " has failed!");
+                        context.Information("Package " + package.GetFilename() + " was NOT pushed to the repo!");
                     continue;
                 }
                 pushed = true;
