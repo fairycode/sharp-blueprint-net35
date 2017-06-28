@@ -210,15 +210,15 @@ Task("Publish-NuGet")
     .WithCriteria(() => !isLocalBuild && !isPullRequest && isBuildTagged)
     .Does(() =>
 {
-    var url = EnvironmentVariable("NUGET_API_URL");
-    if (string.IsNullOrEmpty(url))
-        throw new InvalidOperationException("Could not resolve NuGet API url");
+    //var url = EnvironmentVariable("NUGET_API_URL");
+    //if (string.IsNullOrEmpty(url))
+    //    throw new InvalidOperationException("Could not resolve NuGet API url");
 
     var key = EnvironmentVariable("NUGET_API_KEY");
     if (string.IsNullOrEmpty(key))
         throw new InvalidOperationException("Could not resolve NuGet API key");
 
-    UploadPackages(Context, url, key, nugetDir);
+    UploadPackages(Context, null, key, nugetDir);
 })
 .OnError(exception =>
 {
@@ -309,18 +309,23 @@ private static void UploadPackages(ICakeContext context, string url, string key,
 
         var args = new StringBuilder();
         args.Append("push ").Append(context.MakeAbsolute(package));
-        args.Append(" -Source ").Append(url);
+
+        if (!string.IsNullOrEmpty(url))
+            args.Append(" -Source ").Append(url);
+
         args.Append(" -ApiKey ").Append(key);
-        args.Append(" -NonInteractive -NoSymbols");
+        args.Append(" -NonInteractive");
 
         var attempt = 0;
         var pushed = false;
         while (!pushed && attempt++ < 3)
         {
-            using (var process = context.StartAndReturnProcess(
-                nugetCmd,
-                new ProcessSettings { Arguments = args.ToString() }
-            ))
+            var arguments = args.ToString();
+            // symbols packages are pushed explicitly
+            if (!package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+                arguments += " -NoSymbols";
+
+            using (var process = context.StartAndReturnProcess(nugetCmd, new ProcessSettings { Arguments = arguments }))
             {
                 process.WaitForExit();
                 var exitCode = process.GetExitCode();
