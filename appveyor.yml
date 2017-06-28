@@ -10,7 +10,7 @@ environment:
   MYGET_SERVER_URL: https://www.myget.org/F/fairycode-ci/api/v2/package
   MYGET_SYMBOL_SERVER_URL: https://www.myget.org/F/fairycode-ci/symbols/api/v2/package
   MYGET_API_KEY:
-    secure: 
+    secure: 0lDXR8Vfp0v0azE55fJ/gfXnZ9JfFcokOtBGJgaqGB1zYgzPX4H0op+rQEf3j6UE
 
 init:
   - git config --global core.autocrlf true
