@@ -2,9 +2,15 @@ environment:
   CONFIGURATION: Release
   TARGET: Default
 
-  NUGET_API_URL: https://www.nuget.org/api/v2/package
+  NUGET_SERVER_URL: https://www.nuget.org/api/v2/package
+  NUGET_SYMBOL_SERVER_URL: https://nuget.smbsrc.net/api/v2/package
   NUGET_API_KEY:
     secure: EA06oAdAgaBCIJtU3ArzLp8uYgXBtEtZXoBqQGhxvgOJcxiSahALa4cpn31H85eh
+
+  MYGET_SERVER_URL: https://www.myget.org/F/fairycode-ci/api/v2/package
+  MYGET_SYMBOL_SERVER_URL: https://www.myget.org/F/fairycode-ci/symbols/api/v2/package
+  MYGET_API_KEY:
+    secure: 
 
 init:
   - git config --global core.autocrlf true

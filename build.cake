@@ -81,7 +81,6 @@ Task("Build")
     var projects = GetFiles("./src/**/*.csproj");
     projects.Add(GetFiles("./test/**/*.csproj"));
 
-    //var msbuildCmd = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Community\\MSBuild\\15.0\\Bin\\MSBuild.exe";
     var msbuildCmd = "msbuild";
 
     foreach(var project in projects)
@@ -171,9 +170,8 @@ Task("Create-Packages")
     args.Append("pack ").Append(projectFile);
     args.Append(" -Symbols -Properties Configuration=").Append(configuration);
     args.Append(" -OutputDirectory ").Append(nugetDir);
-    //args.Append(" -Suffix build-").Append(buildNumber.ToString("D4"));
 
-    // nuget.exe pack SharpBlueprint.Client.csproj -Symbols -Properties Configuration=configuration -OutputDirectory nugetDir -Suffix revision
+    // nuget.exe pack SharpBlueprint.Client.csproj -Symbols -Properties Configuration=configuration -OutputDirectory nugetDir
     using (var process = StartAndReturnProcess(
         nugetCmd,
         new ProcessSettings { Arguments = args.ToString() }
@@ -190,15 +188,24 @@ Task("Publish-MyGet")
     .WithCriteria(() => !isLocalBuild && !isPullRequest && !isBuildTagged)
     .Does(() =>
 {
-    var url = EnvironmentVariable("MYGET_API_URL");
-    if (string.IsNullOrEmpty(url))
-        throw new InvalidOperationException("Could not resolve MyGet API url");
+    var serverUrl = EnvironmentVariable("MYGET_SERVER_URL");
+    if (string.IsNullOrEmpty(serverUrl))
+        throw new InvalidOperationException("Could not resolve MyGet server URL");
 
-    var key = EnvironmentVariable("MYGET_API_KEY");
-    if (string.IsNullOrEmpty(key))
+    var symbolServerUrl = EnvironmentVariable("MYGET_SYMBOL_SERVER_URL");
+
+    var apiKey = EnvironmentVariable("MYGET_API_KEY");
+    if (string.IsNullOrEmpty(apiKey))
         throw new InvalidOperationException("Could not resolve MyGet API key");
 
-    UploadPackages(Context, url, key, nugetDir);
+    foreach (var package in GetFiles(nugetDir + "/*.nupkg"))
+    {
+        // symbols packages are pushed alongside regular ones so no need to push them explicitly
+        if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        UploadPackage(Context, serverUrl, symbolServerUrl, apiKey, package);
+    }
 })
 .OnError(exception =>
 {
@@ -210,15 +217,24 @@ Task("Publish-NuGet")
     .WithCriteria(() => !isLocalBuild && !isPullRequest && isBuildTagged)
     .Does(() =>
 {
-    //var url = EnvironmentVariable("NUGET_API_URL");
-    //if (string.IsNullOrEmpty(url))
-    //    throw new InvalidOperationException("Could not resolve NuGet API url");
+    var serverUrl = EnvironmentVariable("NUGET_SERVER_URL");
+    if (string.IsNullOrEmpty(serverUrl))
+        throw new InvalidOperationException("Could not resolve NuGet server URL");
 
-    var key = EnvironmentVariable("NUGET_API_KEY");
-    if (string.IsNullOrEmpty(key))
+    var symbolServerUrl = EnvironmentVariable("NUGET_SYMBOL_SERVER_URL");
+
+    var apiKey = EnvironmentVariable("NUGET_API_KEY");
+    if (string.IsNullOrEmpty(apiKey))
         throw new InvalidOperationException("Could not resolve NuGet API key");
 
-    UploadPackages(Context, null, key, nugetDir);
+    foreach (var package in GetFiles(nugetDir + "/*.nupkg"))
+    {
+        // symbols packages are pushed alongside regular ones so no need to push them explicitly
+        if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+            continue;
+
+        UploadPackage(Context, serverUrl, symbolServerUrl, apiKey, package);
+    }
 })
 .OnError(exception =>
 {
@@ -231,6 +247,7 @@ Task("Publish-NuGet")
 
 Task("Default")
     .IsDependentOn("Create-Packages")
+    .IsDependentOn("Publish-MyGet")
     .IsDependentOn("Publish-NuGet");
 
 //
@@ -295,37 +312,19 @@ private static string GetVersion(string csproj)
 }
 
 /// <summary>
-/// Uploads packages to the repo.
+/// Uploads package to the repo.
 /// </summary>
-private static void UploadPackages(ICakeContext context, string url, string key, string nugetDir)
+private static void UploadPackage(ICakeContext context, string serverUrl, string symbolServerUrl, string apiKey, FilePath packagePath)
 {
     var nugetCmd = context.MakeAbsolute(new FilePath("tools/NuGet.CommandLine/tools/NuGet.exe"));
 
-    foreach (var package in context.GetFiles(nugetDir + "/*.nupkg"))
+    Func<string, bool> Push = (nugetArgs) =>
     {
-        // symbols packages are pushed alongside regular ones so no need to push them explicitly
-        //if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
-        //    continue;
-
-        var args = new StringBuilder();
-        args.Append("push ").Append(context.MakeAbsolute(package));
-
-        if (!string.IsNullOrEmpty(url))
-            args.Append(" -Source ").Append(url);
-
-        args.Append(" -ApiKey ").Append(key);
-        args.Append(" -NonInteractive");
-
         var attempt = 0;
         var pushed = false;
         while (!pushed && attempt++ < 3)
         {
-            var arguments = args.ToString();
-            // symbols packages are pushed explicitly
-            if (!package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
-                arguments += " -NoSymbols";
-
-            using (var process = context.StartAndReturnProcess(nugetCmd, new ProcessSettings { Arguments = arguments }))
+            using (var process = context.StartAndReturnProcess(nugetCmd, new ProcessSettings { Arguments = nugetArgs }))
             {
                 process.WaitForExit();
                 var exitCode = process.GetExitCode();
@@ -333,15 +332,44 @@ private static void UploadPackages(ICakeContext context, string url, string key,
                 {
                     if (attempt < 3)
                     {
-                        context.Information("Failed to push " + package.GetFilename() + ". Error code: " + exitCode);
+                        context.Information("Package was not pushed. Error code: " + exitCode);
                         context.Information("Attempt: " + (attempt + 1));
                     }
-                    else
-                        context.Information("Package " + package.GetFilename() + " was NOT pushed to the repo!");
                     continue;
                 }
                 pushed = true;
             }
         }
+        return pushed;
+    };
+
+    var packageName = packagePath.GetFilename();
+
+    var pushArgs = new StringBuilder();
+    pushArgs.Append("push ").Append(context.MakeAbsolute(packagePath));
+    pushArgs.Append(" -Source ").Append(serverUrl);
+    pushArgs.Append(" -ApiKey ").Append(apiKey);
+    pushArgs.Append(" -NonInteractive -NoSymbols");
+
+    var packagePushed = Push(pushArgs.ToString());
+    if (packagePushed && !string.IsNullOrEmpty(symbolServerUrl))
+    {
+        var symbolPackagePath = new FilePath(packagePath.FullPath.Replace(".nupkg", ".symbols.nupkg"));
+        if (context.FileExists(symbolPackagePath))
+        {
+            var pushSymbolArgs = new StringBuilder();
+            pushSymbolArgs.Append("push ").Append(context.MakeAbsolute(symbolPackagePath));
+            pushSymbolArgs.Append(" -Source ").Append(symbolServerUrl);
+            pushSymbolArgs.Append(" -ApiKey ").Append(apiKey);
+            pushSymbolArgs.Append(" -NonInteractive");
+
+            var symbolsPushed = Push(pushSymbolArgs.ToString());
+            if (!symbolsPushed)
+                context.Information("Failed to push symbols for package " + packageName);
+        }
+    }
+    else
+    {
+       context.Information("Package " + packageName + " was NOT pushed to the repo!"); 
     }
 }
